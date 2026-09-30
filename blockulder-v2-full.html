@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>blockulder</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: sans-serif; display: flex; margin: 0; height: 100vh; background-color: #f0f2f5; overflow: hidden; position: relative; }
+        
+        #toolbox { width: 260px; background-color: #ffffff; border-right: 2px solid #ccc; display: flex; flex-direction: column; height: 100vh; }
+        #toolbox h3 { padding: 20px 20px 5px 20px; margin: 0; background-color: #fff; }
+
+        .category-menu { display: flex; flex-wrap: wrap; gap: 5px; padding: 10px 20px; border-bottom: 1px solid #ddd; background-color: #fff; }
+        .category-btn { background-color: #e0e0e0; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; transition: background 0.2s; }
+        .category-btn.active { background-color: #333; color: #fff; }
+
+        .toolbox-content { flex: 1; padding: 15px 20px 80px 20px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; overflow-x: hidden; }
+        
+        /* Estilo do novo Separador na Toolbox */
+        .toolbox-separator {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 8px 0;
+            user-select: none;
+        }
+        .toolbox-separator::before, .toolbox-separator::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background-color: #ccc;
+        }
+        .toolbox-separator span {
+            font-size: 11px;
+            font-weight: bold;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        #workspace { flex: 1; padding: 20px 20px 150px 20px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; background-image: radial-gradient(#ccc 1px, transparent 1px); background-size: 20px 20px; overflow-y: auto; height: 100vh; }
+        #workspace h3 { margin-top: 0; width: 100%; }
+
+        #output-panel { width: 320px; background-color: #1e1e1e; color: #fff; padding: 20px; display: flex; flex-direction: column; gap: 15px; border-left: 2px solid #ccc; z-index: 10; height: 100vh; }
+        
+        #code-output { 
+            flex-grow: 1; 
+            background-color: #2d2d2d; 
+            color: #a9dc76; 
+            font-family: 'Consolas', 'Courier New', Courier, monospace; 
+            font-size: 13px;
+            padding: 12px; 
+            border-radius: 5px; 
+            white-space: pre-wrap; 
+            word-break: break-all;
+            overflow-y: auto; 
+            border: 1px solid #444; 
+        }
+        #run-btn { background-color: #4caf50; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; flex-shrink: 0; }
+        #run-btn:hover { background-color: #45a049; }
+
+        .block { 
+            padding: 8px 12px; 
+            color: white; 
+            font-weight: bold; 
+            border-radius: 8px; 
+            cursor: grab; 
+            user-select: none; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+            display: inline-flex; 
+            flex-direction: column; 
+            gap: 6px; 
+            align-items: flex-start; 
+            width: max-content;
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .block-header { 
+            display: flex; 
+            align-items: center; 
+            flex-wrap: wrap;
+            gap: 6px; 
+            width: 100%; 
+        }
+
+        .block input, .block select { border: none; border-radius: 4px; padding: 4px 6px; font-weight: bold; color: #000; background: #fff; }
+        .block input[type="number"] { width: 50px; }
+        .block input[type="text"] { width: 90px; }
+
+        .block input[type="checkbox"] { 
+            width: 18px; 
+            height: 18px; 
+            cursor: pointer; 
+            accent-color: #4caf50;
+            vertical-align: middle;
+            margin: 0 4px;
+        }
+        
+        .block-slot { 
+            background-color: rgba(0, 0, 0, 0.2); 
+            border: 2px dashed rgba(255, 255, 255, 0.4); 
+            border-radius: 6px; 
+            padding: 4px; 
+            min-width: 60px; 
+            min-height: 30px; 
+            display: inline-flex; 
+            align-items: center; 
+            justify-content: center; 
+            width: auto;
+            height: auto;
+            gap: 4px;
+        }
+        .block-slot.drag-over { background-color: rgba(255, 255, 255, 0.3); border-color: #fff; }
+
+        .statement-slot { 
+            background-color: rgba(0, 0, 0, 0.15); 
+            border: 2px dashed rgba(255, 255, 255, 0.3); 
+            border-radius: 6px; 
+            padding: 8px; 
+            min-width: 180px; 
+            min-height: 40px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 6px; 
+            align-items: flex-start; 
+            margin-top: 2px; 
+            width: 100%;
+            height: auto;
+        }
+        .statement-slot.drag-over { background-color: rgba(255, 255, 255, 0.25); border-color: #fff; }
+
+        #trash-can { position: fixed; bottom: 20px; left: calc(260px + 40px); width: 60px; height: 60px; background-color: #ef5350; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: all 0.2s ease; z-index: 999; }
+        #trash-can.drag-over { background-color: #b71c1c; transform: scale(1.2); }
+    </style>
+</head>
+<body>
+
+    <div id="toolbox">
+        <h3>Blockulder</h3>
+        <div class="category-menu" id="category-menu">
+            <button class="category-btn active" id="btn-todos-fallback">All</button>
+        </div>
+        <div class="toolbox-content" id="toolbox-content"></div>
+    </div>
+
+    <div id="workspace">
+        <h3>Workspace</h3>
+    </div>
+
+    <div id="trash-can">🗑️</div>
+
+    <div id="output-panel">
+        <h3>Generated code</h3>
+        <div id="code-output">// Add blocks to generate code</div>
+        <button id="run-btn">Preview/test code</button>
+    </div>
+
+    <script>
+    const Blockulder = {
+        workspace: null,
+        codeOutput: null,
+        toolboxContent: null,
+        trashCan: null,
+        categoryMenu: null,
+        blockSendoArrastado: null,
+        geradoresDeCodigo: {},
+        categoriasRegistradas: new Set(),
+
+        init() {
+            this.workspace = document.getElementById('workspace');
+            this.codeOutput = document.getElementById('code-output');
+            this.toolboxContent = document.getElementById('toolbox-content');
+            this.trashCan = document.getElementById('trash-can');
+            this.categoryMenu = document.getElementById('category-menu');
+            
+            const btnTodos = document.getElementById('btn-todos-fallback');
+            if (btnTodos) {
+                btnTodos.onclick = () => this.filtrarCategoria('todos', btnTodos);
+            }
+            this.configurarEventosGlobais();
+        },
+
+        injetarMetodoGet(blocoElement) {
+            const self = this;
+            blocoElement.get = function(nome) {
+                const el = blocoElement.querySelector(`[data-name="${nome}"]`);
+                if (!el) return null;
+
+                if (el.classList.contains('block-input')) {
+                    if (el.type === 'checkbox') {
+                        return el.checked;
+                    }
+                    return el.value;
+                }
+                if (el.classList.contains('block-slot')) {
+                    const filhos = Array.from(el.children).filter(c => c.classList.contains('block'));
+                    return filhos.map(f => self.extrairValorDoBloco(f)).join(' ') || "";
+                }
+                if (el.classList.contains('statement-slot')) {
+                    return self.extrairCodigoDoContainer(el);
+                }
+                return null;
+            };
+        },
+
+        registrarCategoriaNaInterface(nome) {
+            if (!this.categoryMenu) return;
+            if (!this.categoriasRegistradas.has(nome)) {
+                this.categoriasRegistradas.add(nome);
+                const btn = document.createElement('button');
+                btn.classList.add('category-btn');
+                btn.innerText = nome.charAt(0).toUpperCase() + nome.slice(1);
+                btn.onclick = () => this.filtrarCategoria(nome, btn);
+                this.categoryMenu.appendChild(btn);
+            }
+        },
+
+        filtrarCategoria(categoria, botaoAtivo) {
+            document.querySelectorAll('.category-btn').forEach(btn => btn.classList.remove('active'));
+            if(botaoAtivo) botaoAtivo.classList.add('active');
+
+            document.querySelectorAll('#toolbox-content > *').forEach(item => {
+                const catItem = item.getAttribute('data-category');
+                item.style.display = (categoria === 'todos' || catItem === categoria) ? 'flex' : 'none';
+            });
+        },
+
+        // --- NOVO OBJETO: SEPARADOR ---
+        definirSeparador(config) {
+            const cat = config.category || 'outros';
+            this.registrarCategoriaNaInterface(cat);
+
+            const divSep = document.createElement('div');
+            divSep.classList.add('toolbox-separator');
+            divSep.setAttribute('data-category', cat);
+
+            if (config.label) {
+                const span = document.createElement('span');
+                span.innerText = config.label;
+                divSep.appendChild(span);
+            }
+
+            if (this.toolboxContent) {
+                this.toolboxContent.appendChild(divSep);
+            }
+        },
+
+        definirBloco(config) {
+            this.geradoresDeCodigo[config.type] = config.generator;
+            const divBloco = document.createElement('div');
+            divBloco.classList.add('block');
+            divBloco.setAttribute('draggable', 'true');
+            divBloco.setAttribute('data-type', config.type);
+            
+            const cat = config.category || 'outros';
+            divBloco.setAttribute('data-category', cat);
+            this.registrarCategoriaNaInterface(cat);
+
+            divBloco.style.backgroundColor = config.color || '#999';
+
+            const header = document.createElement('div');
+            header.classList.add('block-header');
+
+            config.elements.forEach(el => {
+                if (typeof el === 'string') header.appendChild(document.createTextNode(el));
+                else if (el instanceof HTMLElement) {
+                    if (el.classList.contains('statement-slot')) {
+                        divBloco.appendChild(header.cloneNode(true));
+                        header.innerHTML = '';
+                        divBloco.appendChild(el);
+                    } else {
+                        header.appendChild(el);
+                    }
+                }
+            });
+
+            if (header.childNodes.length > 0) divBloco.appendChild(header);
+            
+            this.injetarMetodoGet(divBloco);
+            if(this.toolboxContent) {
+                this.toolboxContent.appendChild(divBloco);
+            }
+        },
+
+        extrairValorDoBloco(bloco) {
+            const tipo = bloco.getAttribute('data-type');
+            return this.geradoresDeCodigo[tipo] ? this.geradoresDeCodigo[tipo](bloco) : '';
+        },
+
+        extrairCodigoDoContainer(container) {
+            const blocos = Array.from(container.children).filter(el => el.classList.contains('block'));
+            let code = "";
+            blocos.forEach(b => { code += this.extrairValorDoBloco(b); });
+            return code;
+        },
+
+        atualizarCodigo() {
+            if (!this.workspace || !this.codeOutput) return;
+            const codigoFinal = this.extrairCodigoDoContainer(this.workspace);
+            this.codeOutput.textContent = codigoFinal || "// Add blocks to generate code";
+            return codigoFinal;
+        },
+
+        configurarStatementSlot(slot) {
+            slot.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); slot.classList.add('drag-over'); });
+            slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+            slot.addEventListener('drop', (e) => {
+                e.preventDefault(); e.stopPropagation(); slot.classList.remove('drag-over');
+                if (this.blockSendoArrastado) {
+                    if (this.blockSendoArrastado.contains(slot)) return;
+                    let bloco = this.blockSendoArrastado;
+                    if (this.blockSendoArrastado.parentElement.id === 'toolbox-content') bloco = this.clonarBlocoMestre(this.blockSendoArrastado);
+                    slot.appendChild(bloco);
+                    this.workspace.querySelectorAll('input[type="checkbox"]').forEach(c => c.checked = c.checked);
+                    this.atualizarCodigo();
+                }
+            });
+        },
+
+        configurarSlot(slot) {
+            slot.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); slot.classList.add('drag-over'); });
+            slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+            slot.addEventListener('drop', (e) => {
+                e.preventDefault(); e.stopPropagation(); slot.classList.remove('drag-over');
+                if (this.blockSendoArrastado) {
+                    if (this.blockSendoArrastado.contains(slot)) return;
+                    let bloco = this.blockSendoArrastado;
+                    if (this.blockSendoArrastado.parentElement.id === 'toolbox-content') bloco = this.clonarBlocoMestre(this.blockSendoArrastado);
+                    slot.appendChild(bloco);
+                    this.workspace.querySelectorAll('input[type="checkbox"]').forEach(c => c.checked = c.checked);
+                    this.atualizarCodigo();
+                }
+            });
+        },
+
+        clonarBlocoMestre(mestre) {
+            const clone = mestre.cloneNode(true);
+            clone.style.opacity = '1';
+            
+            const selectsMestre = mestre.querySelectorAll('select');
+            const selectsClone = clone.querySelectorAll('select');
+            selectsMestre.forEach((s, idx) => { selectsClone[idx].value = s.value; });
+
+            const inputsMestre = mestre.querySelectorAll('input:not([type="checkbox"])');
+            const inputsClone = clone.querySelectorAll('input:not([type="checkbox"])');
+            inputsMestre.forEach((i, idx) => { inputsClone[idx].value = i.value; });
+
+            const checksMestre = mestre.querySelectorAll('input[type="checkbox"]');
+            const checksClone = clone.querySelectorAll('input[type="checkbox"]');
+            checksMestre.forEach((chk, idx) => { checksClone[idx].checked = chk.checked; });
+            
+            this.injetarMetodoGet(clone);
+            
+            clone.querySelectorAll('.block-input').forEach(input => {
+                input.addEventListener('input', () => this.atualizarCodigo());
+                input.addEventListener('change', () => this.atualizarCodigo());
+            });
+            
+            clone.querySelectorAll('.block-slot').forEach(s => this.configurarSlot(s));
+            clone.querySelectorAll('.statement-slot').forEach(s => this.configurarStatementSlot(s));
+            return clone;
+        },
+
+        configurarEventosGlobais() {
+            document.addEventListener('dragstart', (e) => { if (e.target.classList.contains('block')) { this.blockSendoArrastado = e.target; e.target.style.opacity = '0.5'; } });
+            document.addEventListener('dragend', (e) => { if (e.target.classList.contains('block')) { e.target.style.opacity = '1'; this.trashCan.classList.remove('drag-over'); this.atualizarCodigo(); } });
+
+            this.trashCan.addEventListener('dragover', (e) => { e.preventDefault(); if (this.blockSendoArrastado && this.blockSendoArrastado.parentElement.id !== 'toolbox-content') this.trashCan.classList.add('drag-over'); });
+            this.trashCan.addEventListener('dragleave', () => this.trashCan.classList.remove('drag-over'));
+            this.trashCan.addEventListener('drop', (e) => { e.preventDefault(); this.trashCan.classList.remove('drag-over'); if (this.blockSendoArrastado && this.blockSendoArrastado.parentElement.id !== 'toolbox-content') { this.blockSendoArrastado.remove(); this.blockSendoArrastado = null; this.atualizarCodigo(); } });
+
+            this.workspace.addEventListener('dragover', (e) => { 
+                e.preventDefault(); 
+                const rect = this.workspace.getBoundingClientRect();
+                const mouseY = e.clientY - rect.top;
+                if (mouseY > rect.height - 50) this.workspace.scrollTop += 16;
+                else if (mouseY < 50) this.workspace.scrollTop -= 16;
+            });
+
+            this.workspace.addEventListener('drop', (e) => {
+                e.preventDefault();
+                if (this.blockSendoArrastado && e.target === this.workspace) {
+                    if (this.blockSendoArrastado.parentElement.id === 'toolbox-content') {
+                        this.workspace.appendChild(this.clonarBlocoMestre(this.blockSendoArrastado));
+                    } else {
+                        this.workspace.appendChild(this.blockSendoArrastado);
+                    }
+                    this.atualizarCodigo();
+                }
+            });
+
+            const runBtn = document.getElementById('run-btn');
+            if (runBtn) {
+                runBtn.addEventListener('click', () => {
+                    const codigo = this.atualizarCodigo();
+                    if (codigo) { 
+                        try {
+                            const codigoLimpo = codigo.trim();
+                            if (codigoLimpo.startsWith('<') || codigoLimpo.toLowerCase().includes('<html>')) {
+                                const novaJanela = window.open();
+                                novaJanela.document.write(codigo);
+                                novaJanela.document.close();
+                            } else {
+                                eval(codigo); 
+                            }
+                        } catch (e) { 
+                            alert("Erro ao executar: " + e.message); 
+                        } 
+                    }
+                });
+            }
+        }
+    };
+
+    const Criar = {
+        slot: (name) => { const d = document.createElement('div'); d.classList.add('block-slot'); if(name) d.setAttribute('data-name', name); Blockulder.configurarSlot(d); return d; },
+        statement: (name) => { const d = document.createElement('div'); d.classList.add('statement-slot'); if(name) d.setAttribute('data-name', name); Blockulder.configurarStatementSlot(d); return d; },
+        number: (name, val) => { const i = document.createElement('input'); i.type = 'number'; i.value = val; i.classList.add('block-input'); if(name) i.setAttribute('data-name', name); return i; },
+        text: (name, val) => { const i = document.createElement('input'); i.type = 'text'; i.value = val; i.classList.add('block-input'); if(name) i.setAttribute('data-name', name); return i; },
+        dropdown: (name, opcoes) => {
+            const s = document.createElement('select'); s.classList.add('block-input'); if(name) s.setAttribute('data-name', name);
+            opcoes.forEach(o => { const op = document.createElement('option'); op.value = o; op.text = o; s.appendChild(op); });
+            return s;
+        },
+        checkbox: (name, defaultChecked) => {
+            const c = document.createElement('input');
+            c.type = 'checkbox';
+            c.checked = !!defaultChecked;
+            c.classList.add('block-input');
+            if (name) c.setAttribute('data-name', name);
+            c.addEventListener('change', () => {
+                if (window.Blockulder) Blockulder.atualizarCodigo();
+            });
+            return c;
+        },
+        // Helper no helper 'Criar' para declarar separadores facilmente
+        separator: (category, label) => {
+            Blockulder.definirSeparador({ category, label });
+        }
+    };
+
+    document.addEventListener("DOMContentLoaded", () => {
+        Blockulder.init();
+
+        // --- CATEGORIA: BLOCK ---
+
+        // --- CATEGORIA: BASIC ---
+        Blockulder.definirBloco({
+            category: 'basic', type: 'bloco_repetir', color: '#2196f3',
+            elements: ['Repeat', Criar.number('VEZES', 3), 'times:', Criar.statement('CONTEUDO')],
+            generator: (bloco) => {
+                const vezes = bloco.get('VEZES') || 0;
+                const codigoInterno = bloco.get('CONTEUDO');
+                const indentado = codigoInterno.split('\n').map(l => l ? '  ' + l : '').join('\n');
+                return `for (let i = 0; i < ${vezes}; i++) {\n${indentado}}\n`;
+            }
+        });
+
+        Blockulder.definirBloco({
+            category: 'basic', type: 'bloco_se', color: '#e91e63',
+            elements: ['If value', Criar.dropdown('OPERADOR', ['>', '<', '==']), Criar.number('ALVO', 5), 'do:', Criar.statement('CORPO')],
+            generator: (bloco) => {
+                const op = bloco.get('OPERADOR');
+                const num = bloco.get('ALVO') || 0;
+                const codigoInterno = bloco.get('CORPO');
+                const indentado = codigoInterno.split('\n').map(l => l ? '  ' + l : '').join('\n');
+                return `if (10 ${op} ${num}) {\n${indentado}}\n`;
+            }
+        });
+
+        Blockulder.definirBloco({
+            category: 'basic', type: 'bloco_imprimir', color: '#4caf50',
+            elements: ['Show on console (log):', Criar.slot('MENSAGEM')],
+            generator: (bloco) => { return `console.log(${bloco.get('MENSAGEM')});\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'basic', type: 'bloco_texto', color: '#9c27b0',
+            elements: ['text:', Criar.text('CONTEUDO_TEXTO', 'Hello World!')],
+            generator: (bloco) => { return `'${bloco.get('CONTEUDO_TEXTO').replace(/'/g, "\\'")}'`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'basic', type: 'js_join', color: '#EBF527',
+            elements: ['Join ', Criar.slot('no2'), Criar.slot('valor2')],
+            generator: (bloco) => {
+                const ea = bloco.get('no2') || '';
+                const eb = bloco.get('valor2') || '';
+                return `${ea}${eb}\n`;
+            }
+        });
+
+        Blockulder.definirBloco({
+            category: 'basic', type: 'boolean', color: '#EBF527',
+            elements: ['Boolean value ',  Criar.dropdown('value', ['true','false'])],
+            generator: (bloco) => { return bloco.get('value'); }
+        });
+
+        Blockulder.definirBloco({
+            category: 'basic', type: 'color', color: '#404040',
+            elements: ['color', Criar.dropdown('cor', ['dark grey','bright yellow','yellish orange','cyan','bright cyan','dark cyan','black','white','red'])],
+            generator: (bloco) => {
+                const cores = {
+                    'dark grey': '#404040', 'bright yellow': '#EBF527', 'yellish orange': '#F5B027',
+                    'cyan': '#00FFFF', 'bright cyan': '#0AFFFF', 'dark cyan': '#008B8B',
+                    'black': '#000000', 'white': '#ffffff', 'red': '#ff0000'
+                };
+                return `'${cores[bloco.get('cor')] || '#404040'}'`;
+            }
+        });
+
+        Blockulder.definirBloco({
+            category: 'basic', type: 'code', color: '#000000',
+            elements: ['code ', Criar.text('code_cnt', 'console.log("Hello World!")')],
+            generator: (bloco) => { return `${bloco.get('code_cnt')}\n`; }
+        });
+
+        // --- CATEGORIA: HTML ---
+        Blockulder.definirBloco({
+            category: 'html', type: 'html', color: '#ff5722',
+            elements: ['HTML', Criar.statement('CONTEUDO_HTML')],
+            generator: (bloco) => { return `<html>\n${bloco.get('CONTEUDO_HTML')}</html>\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'html', type: 'html_head', color: '#ff5722',
+            elements: ['head', Criar.statement('CONTEUDO_HEAD')],
+            generator: (bloco) => { return `<head>\n${bloco.get('CONTEUDO_HEAD')}</head>\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'html', type: 'html_body', color: '#ff5722',
+            elements: ['body', Criar.statement('CONTEUDO_BODY')],
+            generator: (bloco) => { return `<body>\n${bloco.get('CONTEUDO_BODY')}</body>\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'html', type: 'html_title', color: '#ff5722',
+            elements: ['title', Criar.text('CONTEUDO_TITLE', 'page')],
+            generator: (bloco) => { return `<title>${bloco.get('CONTEUDO_TITLE')}</title>\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'html', type: 'html_text', color: '#ff5722',
+            elements: ['text', Criar.dropdown('CONTEUDO_TEXT',[ 'p','h1','h2','h3','h4','h5','h6','i','strong','em','mark','small','del','ins','sub','sup','b']), Criar.text('text','Hello World')],
+            generator: (bloco) => { return `<${bloco.get('CONTEUDO_TEXT')}>\n  ${bloco.get('text')}\n</${bloco.get('CONTEUDO_TEXT')}>\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'html', type: 'html_div', color: '#ff5722',
+            elements: ['div', Criar.statement('CONTEUDO_DIV'), 'id:' ,Criar.text('div-id', 'a id')],
+            generator: (bloco) => { return `<div id="${bloco.get('div-id')}">\n${bloco.get('CONTEUDO_DIV')}</div>\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'html', type: 'html_div2', color: '#ff5722',
+            elements: ['div', Criar.statement('CONTEUDO_DIV2')],
+            generator: (bloco) => { return `<div>\n${bloco.get('CONTEUDO_DIV2')}</div>\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'html', type: 'html_button', color: '#ff5722',
+            elements: ['Button ', Criar.text('no2', 'a text')],
+            generator: (bloco) => { return `<button>${bloco.get('no2')}</button>\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'html', type: 'html_br', color: '#ff5722',
+            elements: ['Break line'],
+            generator: (bloco) => { return `<br>\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'html', type: 'html_a', color: '#ff5722',
+            elements: ['Link (a)', Criar.statement('ee2')],
+            generator: (bloco) => { return `<a>\n${bloco.get('ee2')}\n</a>\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'html', type: 'html_page_icon', color: '#ff5722',
+            elements: ['Page icon', Criar.text('oi','URL')],
+            generator: (bloco) => { return `<link rel="icon" type="image/x-icon" href="${bloco.get('oi') || ''}">\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'html', type: 'html_footer', color: '#ff5722',
+            elements: ['footer', Criar.statement('no2')],
+            generator: (bloco) => { return `<footer>${bloco.get('no2')}</footer>\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'html', type: 'html_canvas', color: '#ff5722',
+            elements: ['canvas ID', Criar.text('id_canvas','ID'), Criar.statement('no3')],
+            generator: (bloco) => { return `<canvas id="${bloco.get('id_canvas')}">${bloco.get('no3')}</canvas>\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'html', 
+            type: 'html_script', 
+            color: '#ff5722',
+            elements: ['custom ',Criar.text('c'), Criar.statement('no3'), Criar.text('c2')],
+            generator: (bloco) => { 
+                const codigoInterno = bloco.get('no3') || '';
+                return  + `${bloco.get('c')}\n${codigoInterno}\n${bloco.get('c2')}\n`; 
+            }
+        });
+
+        // --- CATEGORIA: CSS ---
+        Blockulder.definirBloco({
+            category: 'css', type: 'html_css_selector', color: '#F5B027',
+            elements: ['CSS for ', Criar.text('obj', 'body'), Criar.statement('css')],
+            generator: (bloco) => { return `${bloco.get('obj')} {\n${bloco.get('css')}}\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'css', type: 'html_css_id_selector', color: '#F5B027',
+            elements: ['CSS for ID ', Criar.text('obj', 'body'), Criar.statement('css')],
+            generator: (bloco) => { return `#${bloco.get('obj')} {\n${bloco.get('css')}\n}\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'css', type: 'html_css', color: '#F5B027',
+            elements: ['CSS ', Criar.dropdown('obj', ['text-align','border-radius','font-size','color','background-color','background-image','font-style','align-items','align-self','aspect-ratio','animation-delay','animation-direction','animation-name','animation-duration','animation-fill-mode','animation-iteration-count','animation-play-state','animation-timing-function','backdrop-filter','backface-visibility','background-attachment','background-blend-mode','background-clip','background-origin','background-position','background-position-x','background-position-y','background-repeat','background-size','block-size','border-block-color','border-block-end-color','block-border-end-style','border-block-end-width','border-block-start-color','border-block-start-style','border-block-start-width','border-bottom-color','border-bottom-style','border-bottom-width','border-bottom-left-radius','border-bottom-right-radius','border-collapse','border-end-end-radius','border-end-start-radius','border-image-outset','border-image-repeat','border-image-slice','border-image-source','border-image-width','border-inline-color','border-inline-end-color','border-inline-style','border-inline-end-width','border-inline-start-color','border-inline-start-style','border-inline-style','border-inline-width','border-left-color','border-left-style','border-left-width','border-right-color', 'border-right-style','border-right-width','margin','margin-top','margin-bottom','margin-left','margin-right','padding','padding-top','padding-bottom','padding-left','padding-right','width','height','max-width','max-height','min-width','min-height','display','position','top','bottom','left','right','z-index','flex','flex-direction','flex-wrap','justify-content','gap','grid-template-columns','grid-template-rows','opacity','visibility','cursor','box-shadow','text-shadow','text-transform','text-decoration','line-height','letter-spacing','overflow','overflow-x','overflow-y','border','border-color','border-style','border-width','transition','transform']), Criar.slot('css')],
+            generator: (bloco) => {
+                let valorCss = bloco.get('css') || '';
+                valorCss = valorCss.replace(/^'|'$/g, '').trim(); 
+                return `  ${bloco.get('obj')}: ${valorCss};\n`;
+            }
+        });
+
+        Blockulder.definirBloco({
+            category: 'css', type: 'html_css_style', color: '#F5B027',
+            elements: ['style', Criar.statement('ee')],
+            generator: (bloco) => { return `<style>\n${bloco.get('ee')}\n</style>\n`; }
+        });
+
+        // --- CATEGORIA: JAVASCRIPT ---
+        Blockulder.definirBloco({
+            category: 'javascript', type: 'js_var', color: '#EBF527',
+            elements: [Criar.dropdown('tipo', ['const','var']), ' ', Criar.text('no', 'ye'), '=', Criar.slot('valor1')],
+            generator: (bloco) => { return `${bloco.get('tipo')} ${bloco.get('no')} = ${bloco.get('valor1') || "''"};\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'javascript', type: 'js_element_get', color: '#EBF527',
+            elements: ['get element from ID ', Criar.text('obj', 'body')],
+            generator: (bloco) => { return `document.getElementById("${bloco.get('obj')}");\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'javascript', type: 'js_get_var', color: '#EBF527',
+            elements: ['item ', Criar.text('nome_var', 'ye')],
+            generator: (bloco) => { return `${bloco.get('nome_var')}`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'javascript', type: 'js_function', color: '#EBF527',
+            elements: ['Function ', Criar.text('nome_func', 'myFunction'), 'do:', Criar.statement('corpo_func')],
+            generator: (bloco) => { return `function ${bloco.get('nome_func')}() {\n${bloco.get('corpo_func')}}\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'javascript', type: 'js_call_function', color: '#EBF527',
+            elements: ['Call function ', Criar.text('nome_func', 'myFunction')],
+            generator: (bloco) => { return `${bloco.get('nome_func')}();\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'javascript', type: 'js_math', color: '#EBF527',
+            elements: [Criar.slot('num1'), Criar.dropdown('operador', ['+', '-', '*', '/']), Criar.slot('num2')],
+            generator: (bloco) => { return `(${bloco.get('num1') || '0'} ${bloco.get('operador')} ${bloco.get('num2') || '0'})`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'javascript', type: 'js_alert', color: '#EBF527',
+            elements: ['Alert window:', Criar.slot('mensagem')],
+            generator: (bloco) => { return `alert(${bloco.get('mensagem') || "''"});\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'javascript', type: 'js_set_text_by_id', color: '#EBF527',
+            elements: ['In element ID:', Criar.text('el_id', 'my-id'), 'set text to:', Criar.slot('novo_texto')],
+            generator: (bloco) => { return `document.getElementById('${bloco.get('el_id')}').innerText = ${bloco.get('novo_texto') || "''"};\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'javascript', type: 'js_click_event', color: '#EBF527',
+            elements: ['When element ID:', Criar.text('el_id', 'btn-id'), 'is clicked do:', Criar.statement('corpo_evento')],
+            generator: (bloco) => { return `document.getElementById('${bloco.get('el_id')}').addEventListener('click', function() {\n${bloco.get('corpo_evento')}});\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'javascript', type: 'js_if_else', color: '#EBF527',
+            elements: ['If', Criar.slot('condicao'), 'do:', Criar.statement('corpo_if'), 'else do:', Criar.statement('corpo_else')],
+            generator: (bloco) => { return `if (${bloco.get('condicao') || 'true'}) {\n${bloco.get('corpo_if')}} else {\n${bloco.get('corpo_else')}}\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'javascript', type: 'js_compare', color: '#EBF527',
+            elements: [Criar.slot('val1'), Criar.dropdown('operador', ['==', '===', '!=', '>', '<', '>=', '<=']), Criar.slot('val2')],
+            generator: (bloco) => { return `(${bloco.get('val1') || '0'} ${bloco.get('operador')} ${bloco.get('val2') || '0'})`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'javascript', type: 'js_set_style_by_id', color: '#EBF527',
+            elements: ['In element ID:', Criar.text('el_id', 'my-id'), 'change CSS property:', Criar.text('prop', 'backgroundColor'), 'to:', Criar.slot('valor_style')],
+            generator: (bloco) => { return `document.getElementById('${bloco.get('el_id')}').style.${bloco.get('prop')} = ${bloco.get('valor_style') || "''"};\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'javascript', type: 'js_timeout', color: '#EBF527',
+            elements: ['After waiting', Criar.number('tempo', 1000), 'ms, do:', Criar.statement('corpo_timeout')],
+            generator: (bloco) => { return `setTimeout(function() {\n${bloco.get('corpo_timeout')}}, ${bloco.get('tempo') || 1000});\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'javascript', type: 'js_create_array', color: '#EBF527',
+            elements: ['Create list with items:', Criar.slot('itens_array')],
+            generator: (bloco) => { return `[${(bloco.get('itens_array') || '').trim().replace(/\s+/g, ', ')}]`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'javascript', type: 'js_array_push', color: '#EBF527',
+            elements: ['In list variable:', Criar.text('nome_array', 'myList'), 'add item:', Criar.slot('item_add')],
+            generator: (bloco) => { return `${bloco.get('nome_array')}.push(${bloco.get('item_add') || "''"});\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'javascript', type: 'js_random_number', color: '#EBF527',
+            elements: ['Random integer from 0 to:', Criar.number('max_num', 10)],
+            generator: (bloco) => { return `Math.floor(Math.random() * (${bloco.get('max_num') || 10} + 1))`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'javascript', type: 'element_set_text', color: '#EBF527',
+            elements: ['Set text in element ID  ',  Criar.text('value', 'ID'), 'to', Criar.slot('content')],
+            generator: (bloco) => { return `document.getElementById('${bloco.get('value')}').textContent = ${bloco.get('content')};`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'javascript', type: 'js_prompt', color: '#EBF527',
+            elements: ['ask', Criar.text('yss','Hello World')],
+            generator: (bloco) => { return `prompt("${bloco.get('yss') || ''}")\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'javascript', type: 'javascript_element_set_class', color: '#EBF527',
+            elements: ['Set class in element ', Criar.slot('no2'), 'to', Criar.text('txt','element')],
+            generator: (bloco) => { return `${bloco.get('no2') || ''}.className = ${bloco.get('txt')};\n`; }
+        });
+
+        Blockulder.definirBloco({
+            category: 'javascript', type: 'element_create', color: '#EBF527',
+            elements: ['create new  ', Criar.dropdown('item', ['div','h1','h2','h3','h4','h5','h6','p','i','strong'])],
+            generator: (bloco) => { return `document.createElement('${bloco.get('item') || ''}');\n`; }
+        });
+    });
+    </script>
+</body>
+</html>
